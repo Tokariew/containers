@@ -116,7 +116,7 @@ def import_new_books(filepath):
 
     if failed:
         with open(filepath, 'w') as file:
-            file.write('\n'.join(failed))
+            file.write(''.join(failed))
         send_error(f'Failed adding {len(failed)} books.')
         for url in failed:
             logger.error(f"Can't add book {url}")
