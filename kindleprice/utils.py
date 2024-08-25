@@ -10,18 +10,20 @@ from loguru import logger
 from sys import stdout
 
 logger.remove(0)
-logger.add(stdout,
-           level='WARNING',
-           colorize=True,
-           backtrace=False,
-           diagnose=False,
-           format="<level>{level}:</level> {message}\x1b[K")
+logger.add(
+    stdout,
+    level='WARNING',
+    colorize=True,
+    backtrace=False,
+    diagnose=False,
+    format="<level>{level}:</level> {message}\x1b[K"
+)
 logger.add("/srv/logfile", rotation="10 MB", backtrace=True)
 
 
 def getasin(url):
-    asin = url[url.find('/dp/') + 4:]
-    return asin[:10]
+    asin = url[url.find('/dp/') + 4 :]
+    return asin[: 10]
 
 
 def canonicalurl(asin):
@@ -31,10 +33,18 @@ def canonicalurl(asin):
 def get_book_info(url):
     headers = {
         "User-Agent":
-        "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/111.0",
-        "Accept-Language": "en-GB",
+            "Mozilla/5.0 (X11; Linux x86_64; rv:129.0) Gecko/20100101 Firefox/129.0",
+        "Accept-Language":
+            "en-GB"
     }
-    response = requests.get(url, headers=headers)
+    session = requests.Session()
+    session.headers = headers
+    cookie = {
+        "sp-cdn": "L5Z9:PL", 'i18n-prefs': 'USD', 'lc-acbuk': 'en-GB,en;q=0.5'
+    }
+    session.cookies.update(cookie)
+
+    response = session.get(url)
     soup = BeautifulSoup(response.text, "lxml")
 
     name = soup.select_one(selector="#productTitle").getText()
@@ -43,17 +53,25 @@ def get_book_info(url):
         price = soup.select_one(selector="#kindle-price").getText()
     except AttributeError:
         price = soup.select_one(
-            "span[class='a-size-base a-color-secondary ebook-price-value']")
+            "span[class='a-size-base a-color-secondary ebook-price-value']"
+        )
         if price:
             price = price.getText()
         else:
-            price = soup.find("span", {"class": "kindleExtraMessage"})
-            price = price.find('span', {'class': 'a-color-price'}).getText()
-    price = float(price.strip().split()[0][1:])
+            try:
+                price = soup.find("span", {"class": "kindleExtraMessage"})
+                price = price.find('span', {'class': 'a-color-price'}).getText()
+            except AttributeError:
+                price = f" USD {get_price(url.replace('.com', '.co.uk'))}"
+    try:
+        price = float(price.strip().split()[0][1 :])
+    except ValueError:
+        price = float(price.strip().split()[-1])
     image = soup.find("img",
                       id="landingImage")["data-a-dynamic-image"].split('"')[1]
     author = soup.select_one("span[class='author notFaded']").getText()
     author = author.split('\n')[1].strip()
+    session.close()
     return name, author, price, image
 
 
@@ -64,9 +82,12 @@ def get_price(url):
 
 def send_notif(book, min_price=False):
     headers = {
-        'Priority': '3',
-        'Attach': book.image,
-        "Actions": f"view, Check promo, {book.url}, clear=true;"
+        'Priority':
+            '3',
+        'Attach':
+            book.image,
+        "Actions":
+            f"view, Check promo on Amazon, {book.url}, clear=true; view, Good promo?, https://www.ereaderiq.com/dp/{book.asin}"
     }
     lowest = ''
     if min_price:
@@ -77,16 +98,18 @@ def send_notif(book, min_price=False):
         'http://ntfy/book',
         data=
         f'{lowest}{book.title} by {book.author} is currently on sale by {book.diff_price:0.2f}$.',
-        headers=headers)
+        headers=headers
+    )
 
 
 def send_error(txt):
-    requests.post('http://ntfy/book',
-                  data=txt,
-                  headers={
-                      'Tag': 'no_entry',
-                      'Priority': '4'
-                  })
+    requests.post(
+        'http://ntfy/book',
+        data=txt,
+        headers={
+            'Tag': 'no_entry', 'Priority': '4'
+        }
+    )
 
 
 def dump_data(to_dump, filepath):
