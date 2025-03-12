@@ -11,5 +11,5 @@ COPY podcast.sh /scripts/podcast.sh
 COPY toopus.sh /scripts/toopus.sh
 ENTRYPOINT ./podcast.sh -DFOREGROUND
 ARG CACHEBUST
-RUN apk add --no-cache python3 py3-pip ffmpeg newsboat py3-requests py3-slugify py3-setuptools opus-tools bash parallel
-RUN pip3 install r128gain
+RUN apk add --no-cache python3 ffmpeg newsboat py3-requests py3-slugify opus-tools bash parallel py3-pip
+RUN pip install --no-cache-dir --break-system-packages r128gain
